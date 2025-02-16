@@ -1,24 +1,37 @@
-const axios = require('axios');
+const crypto = require('crypto');
+
 
 exports.preSignUp = async (event) => {
-    const telegramToken = event.request.userAttributes['telegramToken'];
-    const telegramApiUrl = `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/getMe`;
+  const authData = event.request.userAttributes;
+  const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
 
-    try {
-        const response = await axios.get(telegramApiUrl);
-        const telegramUser = response.data.result;
+  const checkHash = authData.hash;
+  delete authData.hash;
 
-        event.response.autoConfirmUser = true;
-        event.response.autoVerifyEmail = true;
+  const dataCheckArr = Object.keys(authData)
+    .map(key => `${key}=${authData[key]}`)
+    .sort();
+  const dataCheckString = dataCheckArr.join("\n");
 
-        event.request.userAttributes['telegramId'] = telegramUser.id.toString();
+  const secretKey = crypto.createHash('sha256').update(BOT_TOKEN).digest();
+  const hash = crypto.createHmac('sha256', secretKey).update(dataCheckString).digest('hex');
 
-        return event;
-    } catch (error) {
-        console.error('Error authenticating with Telegram:', error);
-        throw new Error('Failed to authenticate with Telegram');
-    }
+  if (hash !== checkHash) {
+    throw new Error('Data is NOT from Telegram');
+  }
+
+  if (Math.floor(Date.now() / 1000) - authData.auth_date > 86400) {
+    throw new Error('Data is outdated');
+  }
+
+  event.response.autoConfirmUser = true; // auto confirm user
+  event.response.autoVerifyEmail = true; // auto verify email
+
+  event.request.userAttributes.telegramId = authData.id;
+
+  return event;
 };
+
 
 exports.postConf = async (event) => {
     console.log('User successfully confirmed:', event);

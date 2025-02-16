@@ -25,6 +25,36 @@ resources:
             AttributeDataType: String
             Mutable: true
         MfaConfiguration: OFF
+        LambdaConfig:
+          PreSignUp: !GetAtt PreSignUpTriggerLambdaFunction.Arn
+          PostConfirmation: !GetAtt PostConfTriggerLambdaFunction.Arn
+        Policies:
+          SignInPolicy:
+            AllowedFirstAuthFactors:
+              - WEB_AUTHN
+              - PASSWORD
+
+    CognitoInvokePreSignUpLambdaFunction:
+      Type: AWS::Lambda::Permission
+      Properties:
+        Action: lambda:invokeFunction
+        FunctionName: !Ref PreSignUpTriggerLambdaFunction
+        Principal: cognito-idp.amazonaws.com
+        SourceArn: !GetAtt CognitoUserPool.Arn
+
+
+    APIMainUserPoolClient:
+      Type: AWS::Cognito::UserPoolClient
+      Properties:
+        UserPoolId: !Ref CognitoUserPool
+        ClientName: TelegramPoCClient
+        ExplicitAuthFlows:
+          - ALLOW_CUSTOM_AUTH
+          - ALLOW_USER_SRP_AUTH
+          - ALLOW_USER_PASSWORD_AUTH
+          - ALLOW_REFRESH_TOKEN_AUTH
+        PreventUserExistenceErrors: ENABLED
+
 
 functions:
   postConfTrigger:
